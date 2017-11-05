@@ -1,0 +1,52 @@
+
+BUSINESS USERS
+
+
+GET /business-users				admin		// completar metadata
+											
+PUT /business-users/{userId} 	admin		// status 409, Conflicto en el update (esta mal el valor de _ref)
+
+GET /business-users/me			 user
+
+PUT /business-users/me			 user
+
+
+SERVERS
+
+
+POST /servers/ping				app			// status 400, Incumplimiento de precondiciones (parámetros faltantes)
+
+POST /servers					manager		// ¿dónde y cuándo es que se almacena el username y password?
+
+PUT /servers/{serverId}			manager		// status 409, Conflicto en el update (esta mal el valor de _ref)
+
+POST /servers/{serverId}		manager		// status 400, Incumplimiento de precondiciones (parámetros faltantes)
+
+GET /servers					user 		
+
+
+USERS
+
+
+GET /users								app user		
+
+POST /users								app				// id debería generarse por la bd
+														// falta property fb con userId y authToken, property Images
+
+
+POST /users/validate					app 			// falta property facebookAuthToken, images, balance	
+
+GET /users/{userId}						app user		
+
+PUT /users/{userId}						app 			// status 400 Incumplimiento de precondiciones (parámetros faltantes)
+														// status 409 Conflicto en el update (esta mal el valor de _ref)
+
+GET /users/{userId}/cars				app user		// completar metadata	
+
+PUT /users/{userId}/cars/{carId}		app 			// status 409 Conflicto en el update (esta mal el valor de _ref)
+
+GET /users/{userId}/transactions		app user		
+
+POST /users/{userId}/transactions		app 		
+
+GET /users/{userId}/trips				app user		

@@ -5,3 +5,4 @@ npm-debug.log
 exceptions.log
 testrun
 Doxyfile.bak
+public/theme/*

@@ -1,7 +1,8 @@
+'use strict';
 /*istanbul ignore next*/
 
 var Sequelize = require("sequelize");
-var sequelize = require("./db.js").sequelize;
+//var sequelize = require("./db.js").sequelize;
 
 /**
  *  Define estructura de datos de usuario de negocio 'BusinessUser'
@@ -12,6 +13,45 @@ var sequelize = require("./db.js").sequelize;
  *  
  *  Los tres roles corresponden a niveles de acceso para administración del shared server y bases de datos
  */
+
+
+module.exports = function(sequelize, DataTypes) {
+  var BusinessUser = sequelize.define("businessuser", {
+    id: {
+      type: Sequelize.INTEGER,
+      primaryKey: true,
+      unique: true,
+      autoIncrement: true // from 1 onwards
+    },
+    _ref: {
+      type: Sequelize.STRING
+    },
+    username: {
+      type: Sequelize.STRING,
+      unique: true,
+      allowNull: false
+    },
+    password: {
+      type: Sequelize.STRING
+    },
+    name: {
+      type: Sequelize.STRING
+    },
+    surname: {
+      type: Sequelize.STRING
+    },
+    roles: {
+      type: Sequelize.ARRAY(Sequelize.STRING),
+      allowNull: false
+    }
+  }, {
+    timestamps: false
+  });
+ 
+  return BusinessUser;
+};
+
+/*
 const BusinessUser = sequelize.define('businessuser', {
     id: {
       type: Sequelize.STRING,
@@ -43,3 +83,5 @@ const BusinessUser = sequelize.define('businessuser', {
 });
   
 module.exports = BusinessUser;
+
+*/

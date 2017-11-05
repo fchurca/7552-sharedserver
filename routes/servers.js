@@ -6,13 +6,15 @@ var router = express.Router();
 // var router = express();
 
 const Sequelize = require('sequelize');
-var Server = require('../models/server.js');
+//var Server = require('../models/server.js');
+
+var models = require('../models/db'); // loads db.js
+var Server = models.server;       // the model keyed by its name
 
 var Verify = require('./verify');
 var api = require('./api');
 
 // CREATE TABLE servers(id VARCHAR(10) PRIMARY KEY, _ref VARCHAR(40), createdBy INT, createdTime VARCHAR(40), name VARCHAR(40), lastConnection INT);
-
 
 /**
  * Test method to empty the servers database and create a dummy app server in order to make further tests
@@ -23,7 +25,8 @@ var api = require('./api');
 router.get('/initAndWriteDummyServer', function(request, response) {
   // Test code: dummy register and table initialization:
   // force: true will drop the table if it already exists
-  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'){
+  /* istanbul ignore else  */
+	if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'){
 	  Server.sync({force: true}).then(() => {
 		// Table created
 		
@@ -54,14 +57,14 @@ router.get('/initAndWriteDummyServer', function(request, response) {
 				serverToken: token
 			}
 			return response.status(200).json(responseJson);
-		  })
-		  .catch(error => {
-			  return response.status(500).json({code: 0, message: "Unexpected error while trying to create new dummy server for testing."});
-			// mhhh, wth!
-		  });
-	  })
-	}
-	else {
+			}).catch(error => {
+			  	/* istanbul ignore next  */
+				return response.status(500).json({code: 0, message: "Unexpected error while trying to create new dummy server for testing."});
+				// mhhh, wth!
+			});
+	    });
+	} else {
+		/* istanbul ignore next  */
 		return response.status(500).json({code: 0, message: "Incorrect environment to use testing exclusive methods"});
 	}
 });
@@ -71,62 +74,73 @@ router.get('/initAndWriteDummyServer', function(request, response) {
  *
  */
 router.get('/', Verify.verifyToken, Verify.verifyUserRole, function(request, response) {
-  Server.findAll({
-    attributes: ['id', 'username', 'password', '_ref', 'createdBy', 'createdTime', 'name', 'lastConnection']
-  }).then(servers => {
-    if (!servers) {
-      return response.status(500).json({code: 0, message: "Unexpected error"});
-    }
-    return response.status(200).json(servers);
-  })
+	Server.findAll({
+		attributes: ['id', 'username', 'password', '_ref', 'createdBy', 'createdTime', 'name', 'lastConnection']
+	}).then(servers => {
+		/* istanbul ignore if  */
+		if (!servers) {
+			return response.status(500).json({code: 0, message: "Unexpected error"});
+		}
+		return response.status(200).json(servers);
+	})
 });
 
 /**
  *  Da de alta un server.
+ *  Se ignorarán los campos de id, _ref y lastConnection.
  *
  */
 router.post('/', Verify.verifyToken, Verify.verifyManagerRole, function(request, response) {
-  Server.create({
-    id: request.body.id,
-    _ref: request.body._ref,
-    createdBy: request.body.createdBy,
-    createdTime: request.body.createdTime,
-    name: request.body.name,
-    lastConnection: request.body.lastConnection,
-    username: request.body.username,
-    password: request.body.password
-  }).then(server => {
-    if (!server) {
-      return response.status(500).json({code: 0, message: "Unexpected error"});
-    }
-	else{
-		// Now we generate and return a new fresh token with full lifetime length from now
-		var payload = {
-			 username: request.decoded.username,
-			 userOk: request.decoded.userOk,
-			 appOk: request.decoded.appOk, // normally it would be false to business users
-			 managerOk: request.decoded.managerOk,
-			 adminOk: request.decoded.adminOk
-		};
-		var newToken = Verify.getToken(payload);
-		jsonInResponse = {
-			metadata: {version: api.apiVersion},
-			server:{
-				id: server.id,
-				_ref: '',
-				createdBy: request.body.createdBy,
-				createdTime: (new Date).getTime(),
-				name: request.body.name,
-				lastConnection: 0
-			},
-			token: {
-				expiresAt: (new Date).getTime() + process.env.TOKEN_LIFETIME_IN_SECONDS * 1000,
-				token: newToken
-			}
-		};
-		return response.status(201).json(jsonInResponse);
+	// si hay algún parámetro faltante
+	if (api.isEmpty(request.body.id) || api.isEmpty(request.body._ref) || api.isEmpty(request.body.createdBy)
+		|| api.isEmpty(request.body.createdTime) || api.isEmpty(request.body.name)
+		|| api.isEmpty(request.body.lastConnection)) {
+		return response.status(400).json({code: 0, message: "Incumplimiento de precondiciones (parámetros faltantes)"});
 	}
-  });
+
+	Server.create({
+		id: request.body.id,
+		_ref: request.body._ref,
+		createdBy: request.body.createdBy,
+		createdTime: request.body.createdTime,
+		name: request.body.name,
+		lastConnection: request.body.lastConnection,
+		username: request.body.username,
+		password: request.body.password
+	}).then(server => {
+		/* istanbul ignore if  */
+		if (!server) {
+			return response.status(500).json({code: 0, message: "Unexpected error"});
+		} else {
+			// Now we generate and return a new fresh token with full lifetime length from now
+			var payload = {
+				username: request.decoded.username,
+				userOk: request.decoded.userOk,
+				appOk: request.decoded.appOk, // normally it would be false to business users
+				managerOk: request.decoded.managerOk,
+				adminOk: request.decoded.adminOk
+			};
+			var newToken = Verify.getToken(payload);
+			var jsonInResponse = {
+				metadata: {version: api.apiVersion},
+				server: {
+					server: {
+						id: server.id,
+						_ref: '',
+						createdBy: request.body.createdBy,
+						createdTime: (new Date).getTime(),
+						name: request.body.name,
+						lastConnection: 0
+					},
+					token: {
+						expiresAt: (new Date).getTime() + process.env.TOKEN_LIFETIME_IN_SECONDS * 1000,
+						token: newToken
+					}
+				}
+			};
+			return response.status(201).json(jsonInResponse);
+		}
+	});
 });
 
 /**
@@ -180,13 +194,14 @@ router.post('/ping', Verify.verifyToken, Verify.verifyAppRole, function(request,
 				}
 			});
 			return response.end(responseJson);
-		}
-		else{
+		} else {
+			/* istanbul ignore next  */
 			return response.status(500).json({code: 0, message: "Username does not exist"});
 		}
 	}).catch(function (error) {
+		/* istanbul ignore next  */
 		return response.status(500).json({code: 0, message: "Unexpected error at PING: username not found. Error: "+error});
-  });
+    });
 });
 
 /**
@@ -194,29 +209,49 @@ router.post('/ping', Verify.verifyToken, Verify.verifyAppRole, function(request,
  *
  */
 router.put('/:serverId', Verify.verifyToken, Verify.verifyManagerRole, function(request, response) {
-  Server.find({
-    where: {
-      id: request.params.serverId
-    }
-  }).then(server => {
-    if (server) {
-      server.updateAttributes({
-        id: request.body.id,
-        _ref: request.body._ref,
-        name: request.body.name,
-        createdBy: request.body.createdBy,
-        createdTime: request.body.createdTime,
-        name: request.body.name,
-        lastConnection: request.body.lastConnection,
-		username: request.body.username,
-		password: request.body.password
-      }).then(updatedServer => {
-        return response.status(200).json(updatedServer); // TODO Cuidado que esto devuelve solo el id del server
-      });
-    } else {
-      return response.status(500).json({code: 0, message: "Unexpected error"});
-    }
-  });
+	// si hay algún parámetro faltante
+	if (api.isEmpty(request.body.id) || api.isEmpty(request.body._ref) || api.isEmpty(request.body.createdBy)
+		|| api.isEmpty(request.body.createdTime) || api.isEmpty(request.body.name)
+		|| api.isEmpty(request.body.lastConnection)) {
+		return response.status(400).json({code: 0, message: "Incumplimiento de precondiciones (parámetros faltantes)"});
+	}
+
+	Server.find({
+		where: {
+			id: request.params.serverId
+		}
+	}).then(server => {
+		if (server) {
+			server.updateAttributes({
+			    id: request.body.id,
+			    _ref: request.body._ref,
+			    createdBy: request.body.createdBy,
+			    createdTime: request.body.createdTime,
+			    name: request.body.name,
+			    lastConnection: request.body.lastConnection
+			}).then(updatedServer => {
+				var jsonInResponse = {
+					metadata: {
+						version: api.apiVersion
+					},
+					server: {
+						id: updatedServer.id,
+					    _ref: updatedServer._ref,
+					    createdBy: updatedServer.createdBy,
+					    createdTime: 0,
+					    name: updatedServer.name,
+					    lastConnection: 0
+					}
+				};
+		    	return response.status(200).json(jsonInResponse); // TODO Cuidado que esto devuelve solo el id del server
+			});
+		} else {
+			return response.status(404).json({code: 0, message: "No existe el recurso solicitado"});
+		}
+	}).catch(function (error) {
+		/* istanbul ignore next  */
+		return response.status(500).json({code: 0, message: "Unexpected error"});
+    });
 });
 
 /**
@@ -224,25 +259,19 @@ router.put('/:serverId', Verify.verifyToken, Verify.verifyManagerRole, function(
  *
  */
 router.delete('/:serverId', Verify.verifyToken, Verify.verifyManagerRole, function(request, response) {
-  Server.destroy({
-    where: {
-      id: request.params.serverId
-    }
-  }).then(server => {
-    if (!server) {
-      return response.status(404).json({code: 0, message: "Unexpected error"});
-    }
-
-    Server.findAll({ // must return all servers
-      attributes: ['id', '_ref', 'createdBy', 'createdTime', 'name', 'lastConnection', 'username', 'password']
-    })
-    .then(servers => {
-      if (!servers) {
-        return response.status(500).json({code: 0, message: "Unexpected error"});
-      }
-      return response.status(204).json(servers);
-    });
-  });
+	Server.destroy({
+		where: {
+			id: request.params.serverId
+		}
+	}).then(affectedRows => {
+		if (affectedRows == 0) {
+			return response.status(404).json({code: 0, message: "No existe el recurso solicitado"});
+		}
+		return response.status(204).json({});
+	}).catch(function (error) {
+		/* istanbul ignore next  */
+		return response.status(500).json({code: 0, message: "Unexpected error"});
+  	});
 });
 
 /**
@@ -250,16 +279,32 @@ router.delete('/:serverId', Verify.verifyToken, Verify.verifyManagerRole, functi
  *
  */
 router.get('/:serverId', Verify.verifyToken, Verify.verifyUserRole, function(request, response) {
-  Server.find({
-    where: {
-      id: request.params.serverId
-    }
-  }).then(server => {
-    if (!server) {
-      return response.status(500).json({code: 0, message: "Unexpected error"});
-    }
-    return response.status(200).json(server);
-  });
+	Server.find({
+		where: {
+			id: request.params.serverId
+		}
+	}).then(server => {
+		if (!server) {
+			return response.status(404).json({code: 0, message: "Servidor inexistente"});
+		}
+		var jsonInResponse = {
+			metadata: {
+				version: api.apiVersion
+			},
+			server: {
+				id: server.id,
+			    _ref: server._ref,
+			    createdBy: server.createdBy,
+			    createdTime: 0,
+			    name: server.name,
+			    lastConnection: 0
+			}
+		};
+		return response.status(200).json(jsonInResponse);
+	}).catch(function (error) {
+		/* istanbul ignore next  */
+		return response.status(500).json({code: 0, message: "Unexpected error"});
+	});
 });
 
 /**
@@ -269,39 +314,49 @@ router.get('/:serverId', Verify.verifyToken, Verify.verifyUserRole, function(req
  */
 router.post('/:serverId', Verify.verifyToken, Verify.verifyManagerRole, function(request, response) {
 	Server.find({
-    where: {
-      id: request.params.serverId
-    }
-  }).then(server => {
-    if (!server) {
-      return response.status(500).json({code: 0, message: "Unexpected error"});
-    }
-	
-	// var oldToken = request.body.token || request.query.token || request.headers[process.env.TOKEN_HEADER_FLAG];
-	// Verify.invalidateToken(oldToken);
-	
-	// Now we generate and return a new fresh token with full lifetime length from now
-	var payload = {
-		 username: request.decoded.username,
-		 userOk: request.decoded.userOk,
-		 appOk: request.decoded.appOk, // normally it would be false to business users
-		 managerOk: request.decoded.managerOk,
-		 adminOk: request.decoded.adminOk
-	};
-	var newToken = Verify.getToken(payload);
-	
-	var response = JSON.stringify({
-		metadata: {version: api.apiVersion},
-		server: {
-					CreateServerResponse : {
-												server: JSON.stringify(server),
-												token: newToken
-					}
-				}
-	});
+		where: {
+			id: request.params.serverId
+		}
+	}).then(server => {
+		/* istanbul ignore if  */
+		if (!server) {
+			return response.status(500).json({code: 0, message: "Unexpected error"});
+		}
 
-	return response.status(200).json(response);
-  });
+		// var oldToken = request.body.token || request.query.token || request.headers[process.env.TOKEN_HEADER_FLAG];
+		// Verify.invalidateToken(oldToken);
+
+		// Now we generate and return a new fresh token with full lifetime length from now
+		var payload = {
+			username: request.decoded.username,
+			userOk: request.decoded.userOk,
+			appOk: request.decoded.appOk, // normally it would be false to business users
+			managerOk: request.decoded.managerOk,
+			adminOk: request.decoded.adminOk
+		};
+		var newToken = Verify.getToken(payload);
+
+		var responseJson = {
+			metadata: {version: api.apiVersion},
+			server: {
+				server: {
+					server: {
+						id: server.id,
+					    _ref: server._ref,
+					    createdBy: server.createdBy,
+					    createdTime: 0,
+					    name: server.name,
+					    lastConnection: 0
+					}
+				},
+				token: {
+					expiresAt: (new Date).getTime() + process.env.TOKEN_LIFETIME_IN_SECONDS * 1000,
+					token: newToken
+				}
+			}
+		};
+		return response.status(200).json(responseJson);
+	});
 });
 
 module.exports = router;

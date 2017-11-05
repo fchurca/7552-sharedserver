@@ -27,7 +27,18 @@ var config = require(path.join(__dirname, 'config', 'config.json'))[environment]
 
 app.get('/', function(request, response) {
   response.render('pages/index');
-  //response.send('Hello World');
+});
+
+app.get('/users', function(request, response) {
+  response.render('pages/users');
+});
+
+app.get('/businessusers', function(request, response) {
+  response.render('pages/businessusers');
+});
+
+app.get('/appservers', function(request, response) {
+  response.render('pages/appservers');
 });
 
 app.use(bodyParser.urlencoded({ extended: true }));

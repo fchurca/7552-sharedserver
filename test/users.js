@@ -19,7 +19,7 @@ var token_header_flag = 'x-access-token';
 
 chai.use(chaiHttp);
 
-var jwt = require('jsonwebtoken');
+var jwt = require('jsonwebtoken');	
 
 /**
  *  Test methods for application users endpoints
@@ -29,32 +29,112 @@ var jwt = require('jsonwebtoken');
 describe('Users', function()  {
 
 	var usersAPI = require('../routes/users');
+	var serversAPI = require('../routes/servers');
+	var businessUsersAPI = require('../routes/business-users');
 
 	describe('/GET users', function() {
-	  	it('it should GET no users from empty database', function(done) {
+	  	it('it should\'t GET users from empty database', function(done) {
 		    this.timeout(20000);
 		    usersAPI.clearUsersTable()
 			.then( function(fulfilled){
 
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/') 
-				.end((err, res) => {
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
 					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
+					.get('/users/dropUserTable')
 					.end((err, res) => {
-						console.log('Is this body w token?: ', res.body);
-						var token = res.body.token.token;
 
 						chai.request(baseUrl)
-						.get('/users/')
-						.set(token_header_flag, token)
+						.get('/servers/initAndWriteDummyServer/') 
 						.end((err, res) => {
-							res.should.have.status(200);
-							res.body.should.be.a('array');
-							res.body.length.should.be.eql(0);
-							done();
+							var token = res.body.serverToken;
+
+							chai.request(baseUrl)
+							.get('/users/')
+							.set(token_header_flag, token)
+							.end((err, res) => {
+								res.should.have.status(200);
+								res.body.should.have.property('metadata');
+								res.body.should.have.property('users');
+								res.body.users.length.should.be.eql(0);
+								res.body.users.should.be.a('array');
+								done();
+							});
+						});
+					});
+				});	
+			});
+	    });	
+
+	    it('it should GET two users', function(done) {
+		    this.timeout(20000);
+		    usersAPI.clearUsersTable()
+			.then( function(fulfilled){
+
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
+					chai.request(baseUrl)
+					.get('/users/dropUserTable')
+					.end((err, res) => {
+						chai.request(baseUrl)
+						.get('/servers/initAndWriteDummyServer/') 
+						.end((err, res) => {
+							var token = res.body.serverToken;
+
+							var firstUser = {
+								_ref: 'aaa',
+								type: 'conductor',
+								username: 'johnny',
+								password: 'aaaa',
+								fb: {
+									userId: '',
+									authToken: ''
+								},
+								firstName: 'John',
+								lastName: 'Hancock',
+								country: 'Argentina',
+								email: 'johnny123@gmail.com',
+								birthdate: '24/05/1992'
+							};
+							chai.request(baseUrl)
+							.post('/users/')
+							.set(token_header_flag, token)
+							.send(firstUser)
+							.end((err, res) => {
+								res.should.have.status(201);
+								var secondUser = {
+									_ref: 'bbb',
+									type: 'pasajero',
+									username: 'tommy',
+									password: 'bbbb',
+									fb: {
+										userId: '',
+										authToken: ''
+									},
+									firstName: 'Tom',
+									lastName: 'Smith',
+									country: 'EEUU',
+									email: 'tommy@gmail.com',
+									birthdate: '29/01/1989'
+								};
+								chai.request(baseUrl)
+								.post('/users/')
+								.set(token_header_flag, token)
+								.send(secondUser)
+								.end((err, res) => {
+									chai.request(baseUrl)
+									.get('/users/')
+									.set(token_header_flag, token)
+									.end((err, res) => {
+										res.should.have.status(200);
+										res.body.should.have.property('users');
+										res.body.users.length.should.be.eql(2);
+										res.body.users[0].id.should.be.eql(1);
+										res.body.users[1].id.should.be.eql(2);
+										done();
+									});
+								});
+							});
 						});
 					});
 				});
@@ -67,34 +147,81 @@ describe('Users', function()  {
 			this.timeout(15000);
 	  		usersAPI.clearUsersTable().
 			then( function(fulfilled){
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
+					chai.request(baseUrl)
+					.get('/users/dropUserTable')
+					.end((err, res) => {
+						chai.request(baseUrl)
+						.get('/servers/initAndWriteDummyServer/') 
+						.end((err, res) => {
+							var token = res.body.serverToken;
 
-				var newUser = {
-					id: 0,
-					username: 'johnny',
-					password: 'aaaa',
-					name: 'John',
-					surname: 'Hancock',
-					country: 'Argentina',
-					email: 'johnny123@gmail.com',
-					birthdate: '24/05/1992'
-				};
+							var newUser = {
+								_ref: '0',
+								type: 'pasajero',
+								username: 'johnny',
+								password: 'aaaa',
+								fb: {
+									userId: '',
+									authToken: ''
+								},
+								firstName: 'John',
+								lastName: 'Hancock',
+								country: 'Argentina',
+								email: 'johnny123@gmail.com',
+								birthdate: '24/05/1992'
+							};
 
-				chai.request(baseUrl)
-				.get('/servers/initAndWriteDummyServer/') 
-				.end((err, res) => {
-					
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.serverToken;
+							chai.request(baseUrl)
+							.post('/users/')
+							.set(token_header_flag, token)
+							.send(newUser)
+							.end((err, res) => {
+								res.should.have.status(201);
+								res.body.should.have.property('metadata');
+								res.body.should.have.property('user');
+								res.body.user.id.should.be.eql(1);
+							    done();
+							});
+						});
+					});
+				});
+			});
+	    });
+
+	    it('it shouldn\'t POST a user with missing parameters', function(done) {
+			this.timeout(15000);
+	  		usersAPI.clearUsersTable().
+			then( function(fulfilled){
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
+					var newUser = {
+						_ref: '0',
+						type: '',
+						username: 'johnny',
+						password: 'aaaa',
+						firstName: 'John',
+						country: 'Argentina',
+						email: 'johnny123@gmail.com',
+						birthdate: '24/05/1992'
+					};
 
 					chai.request(baseUrl)
-					.post('/users/')
-					.set(token_header_flag, token)
-					.send(newUser)
+					.get('/servers/initAndWriteDummyServer/') 
 					.end((err, res) => {
-						res.should.have.status(201);
-						res.body.should.have.property('surname');
-						res.body.should.have.property('id');
-					  done();
+						var token = res.body.serverToken;
+
+						chai.request(baseUrl)
+						.post('/users/')
+						.set(token_header_flag, token)
+						.send(newUser)
+						.end((err, res) => {
+							res.should.have.status(400);
+							res.body.should.have.property('code');
+							res.body.should.have.property('message');
+	   				    	done();
+						});
 					});
 				});
 			});
@@ -102,40 +229,46 @@ describe('Users', function()  {
 	});
 
 	var userToDelete = {
-		id: 15,
+		_ref: 'aaa',
+		type: 'pasajero',
 		username: 'testUsername',
 		password: 'fakepasswd',
-		name: 'testName',
-		surname: 'testSurname',
+		fb: {
+			userId: '',
+			authToken: ''
+		},
+		firstName: 'testName',
+		lastName: 'testSurname',
 		country: 'Argentina',
 		email: 'testEmail@gmail.com',
 		birthdate: '24/05/1992'
 	};
+
+	var userToDeleteId = 1; // it's the first user in the table
 
 	describe('/DELETE user', function() {
 		it('it shouldn\'t DELETE a user that doesn\'t exist', function(done) {
 			this.timeout(15000);
 	  		usersAPI.clearUsersTable().
 			then( function(fulfilled){
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/')
-				.end((err,res) => {
-
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
 					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
+					.get('/users/dropUserTable')
 					.end((err, res) => {
-						console.log('Is this body w token?: ', res.body);
-						var token = res.body.token.token;
-
 						chai.request(baseUrl)
-						.delete('/users/' + userToDelete.id)
-						.set(token_header_flag, token)
-						.send(userToDelete)
-						.end((err, res) => {
-							res.should.have.status(404);
-							done();
+						.get('/servers/initAndWriteDummyServer/')
+						.end((err,res) => {
+							var serverToken = res.body.serverToken;
+
+							chai.request(baseUrl)
+							.delete('/users/' + userToDeleteId)
+							.set(token_header_flag, serverToken)
+							.send(userToDelete)
+							.end((err, res) => {
+								res.should.have.status(404);
+								done();
+							});
 						});
 					});
 				});
@@ -146,78 +279,76 @@ describe('Users', function()  {
 			this.timeout(15000);
 	  		usersAPI.clearUsersTable().
 			then( function(fulfilled){
-				chai.request(baseUrl)
-				.get('/servers/initAndWriteDummyServer/')
-				.end((err,res) => {
-				
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.serverToken;
-
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
 					chai.request(baseUrl)
-					.post('/users/')
-					.set(token_header_flag, token)
-					.send(userToDelete)
+					.get('/users/dropUserTable')
 					.end((err, res) => {
 						chai.request(baseUrl)
-						.delete('/users/' + userToDelete.id)
-						.set(token_header_flag, token)
-						.send(userToDelete)
-						.end((err, res) => {
-							res.should.have.status(204);
-							done();
+						.get('/servers/initAndWriteDummyServer/')
+						.end((err,res) => {
+							var token = res.body.serverToken;
+
+							chai.request(baseUrl)
+							.post('/users/')
+							.set(token_header_flag, token)
+							.send(userToDelete)
+							.end((err, res) => {
+								chai.request(baseUrl)
+								.delete('/users/' + userToDeleteId)
+								.set(token_header_flag, token)
+								.end((err, res) => {
+									res.should.have.status(204);
+									done();
+								});
+							});					
 						});
-					});					
+					});
 				});
 			});
 	    });
 	});
 
-	describe('/GET user', function() {
-	  	it('it should GET an existing user', function(done) {
+	describe('/GET specific user', function() {
+	  	it('it should GET a specific existing user', function(done) {
 			this.timeout(15000);
-			
 			usersAPI.clearUsersTable().
 			then( function(fulfilled){
-
-				var userToGet = {
-					id: 10,
-					username: 'testUsername10',
-					password: 'aaa',
-					name: 'testName10',
-					surname: 'testSurname10',
-					country: 'Argentina10',
-					email: 'testEmail10@gmail.com',
-					birthdate: '24/05/1992'
-				};
-				
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/')
-				.end((err,res) => {
-	
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
 					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
+					.get('/users/dropUserTable')
 					.end((err, res) => {
-
-						console.log('Is this body w token?: ', res.body);
-						var businessToken = res.body.token.token;
-
+						var userToGet = {
+							_ref: 'aaa',
+							applicationowner: 'hi',
+							type: 'conductor',
+							username: 'testUsername10',
+							password: 'aaa',
+							fb: {
+								userId: '',
+								authToken: ''
+							},
+							firstName: 'testName10',
+							lastName: 'testSurname10',
+							country: 'Argentina10',
+							email: 'testEmail10@gmail.com',
+							birthdate: '24/05/1992'
+						};
+						
+						var userToGetId = 1; // it's the first user in the table	
 						chai.request(baseUrl)
 						.get('/servers/initAndWriteDummyServer')
-						.set(token_header_flag, businessToken)
 						.end((err,res) => {
-							res.should.have.status(200);
 							var serverToken = res.body.serverToken;
-
 							chai.request(baseUrl)
 							.post('/users/')
 							.set(token_header_flag, serverToken)
 							.send(userToGet)
 							.end((err, res) => {
 								chai.request(baseUrl)
-								.get('/users/' + userToGet.id)
-								.set(token_header_flag, businessToken)
+								.get('/users/' + userToGetId)
+								.set(token_header_flag, serverToken)
 								.end((err, res) => {
 									res.should.have.status(200);
 									done();
@@ -234,39 +365,240 @@ describe('Users', function()  {
 			
 			usersAPI.clearUsersTable().
 			then( function(fulfilled){
-
-				var userToGet = {
-					id: 10,
-					username: 'testUsername10',
-					password: 'aaa',
-					name: 'testName10',
-					surname: 'testSurname10',
-					country: 'Argentina10',
-					email: 'testEmail10@gmail.com',
-					birthdate: '24/05/1992'
-				};
-				
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/')
-				.end((err,res) => {
-	
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
 					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
+					.get('/users/dropUserTable')
 					.end((err, res) => {
-
-						console.log('Is this body w token?: ', res.body);
-						var businessToken = res.body.token.token;
+						var userToGetId = 10;
 						
 						chai.request(baseUrl)
-						.get('/users/' + userToGet.id)
-						.set(token_header_flag, businessToken)
-						.end((err, res) => {
-							res.should.have.status(404);
-							res.body.should.have.property('code');
-							done();
-						});						
+						.get('/servers/initAndWriteDummyServer')
+						.end((err,res) => {
+							var serverToken = res.body.serverToken;
+			
+							chai.request(baseUrl)
+							.get('/users/' + userToGetId)
+							.set(token_header_flag, serverToken)
+							.end((err, res) => {
+								res.should.have.status(404);
+								res.body.should.have.property('code');
+								done();
+							});						
+						});
+					});
+				});
+			});
+	    });
+	});
+
+	var userToModify = {
+		_ref: 'aaa',
+		applicationowner: 'aaa',
+		type: 'conductor',
+		username: 'testUsername11',
+		password: 'aaa',
+		firstName: 'testName11',
+		lastName: 'testSurname11',
+		country: 'Argentina11',
+		email: 'testEmail11@gmail.com',
+		birthdate: '24/05/1992'
+	};
+
+	var userToModifyId = 1;
+
+	describe('/PUT user', function() {
+
+		it('it shouldn\'t PUT a user that doesn\'t exist', function(done) {
+			this.timeout(15000);
+			
+			usersAPI.clearUsersTable().
+			then( function(fulfilled){
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
+					chai.request(baseUrl)
+					.get('/users/dropUserTable')
+					.end((err, res) => {
+						chai.request(baseUrl)
+						.get('/servers/initAndWriteDummyServer/')
+						.end((err,res) => {
+						
+							console.log('Is this body w token?: ', res.body);
+							var serverToken = res.body.serverToken;
+
+							chai.request(baseUrl)
+							.put('/users/' + userToModifyId)
+							.set(token_header_flag, serverToken)
+							.send(userToModify)
+							.end((err, res) => {
+								res.should.have.status(404);
+								done();
+							});	
+						});
+					});
+				});
+			});
+	    });
+
+	  	it('it should PUT a modified user', function(done) {
+			this.timeout(15000);
+			
+			usersAPI.clearUsersTable().
+			then( function(fulfilled){
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
+					chai.request(baseUrl)
+					.get('/users/dropUserTable')
+					.end((err, res) => {
+						var userToModify = {
+							_ref: 'aaa',
+							applicationowner: 'aaa',
+							type: 'conductor',
+							username: 'testUsername11',
+							password: 'aaa',
+							fb: {
+								userId: '',
+								authToken: ''
+							},
+							firstName: 'testName11',
+							lastName: 'testSurname11',
+							country: 'Argentina11',
+							email: 'testEmail11@gmail.com',
+							birthdate: '24/05/1992'
+						};
+
+						var userToModifyId = 1;
+						
+						chai.request(baseUrl)
+						.get('/servers/initAndWriteDummyServer/')
+						.end((err,res) => {
+
+							console.log('Is this body w token?: ', res.body);
+							var token = res.body.serverToken;
+
+							chai.request(baseUrl)
+							.post('/users/')
+							.set(token_header_flag, token)
+							.send(userToModify)
+							.end((err, res) => {
+								res.body.should.have.property('user');
+								res.should.have.status(201);
+								userToModify = {
+									_ref: 'aaa',
+									applicationowner: 'aaa',
+									type: 'conductor',
+									username: 'modifiedUsername',
+									password: 'bbb',
+									fb: {
+										userId: '',
+										authToken: ''
+									},
+									firstName: 'testName11',
+									lastName: 'testSurname11',
+									country: 'Argentina11',
+									email: 'testEmail11@gmail.com',
+									birthdate: '24/05/1992'
+								};			
+
+								chai.request(baseUrl)
+								.put('/users/' + userToModifyId)
+								.set(token_header_flag, token)
+								.send(userToModify)
+								.end((err, res) => {
+									res.should.have.status(200);
+									res.body.username.should.equal('modifiedUsername');
+									res.body.password.should.equal('bbb');
+									done();
+								});
+							});
+						});
+					});
+				});
+			});
+	    });
+	});
+
+	describe('/VALIDATE user', function() {
+	  	it('it should VALIDATE an existing user', function(done) {
+			this.timeout(15000);
+			
+			usersAPI.clearUsersTable()
+			.then( function(fulfilled){
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
+					chai.request(baseUrl)
+					.get('/users/dropUserTable')
+					.end((err, res) => {	
+						chai.request(baseUrl)
+						.get('/servers/initAndWriteDummyServer/')
+						.end((err,res) => {
+							var userToValidate = {
+								_ref: 'aaa',
+								applicationowner: 'aaa',
+								type: 'conductor',
+								username: 'testUsername11',
+								password: 'aaa',
+								fb: {
+									userId: '',
+									authToken: ''
+								},
+								firstName: 'testName11',
+								lastName: 'testSurname11',
+								country: 'Argentina11',
+								email: 'testEmail11@gmail.com',
+								birthdate: '24/05/1992'
+							};	
+
+							var token = res.body.serverToken;
+
+							chai.request(baseUrl)
+							.post('/users/')
+							.set(token_header_flag, token)
+							.send(userToValidate)
+							.end((err, res) => {
+								res.body.should.have.property('user');
+								console.log('Server has been created\n');
+								chai.request(baseUrl)
+								.post('/users/validate')
+								.set(token_header_flag, token)
+								.send({"username":"testUsername11", "password":"aaa"})
+								.end((err, res) => {
+									res.should.have.status(200);
+									done();
+								});
+							});
+						});
+					});
+				});
+			});
+	    });
+
+	  	it('it shouldn\'t VALIDATE an user that doesn\'t exist', function(done) {
+			this.timeout(15000);
+			
+			usersAPI.clearUsersTable()
+			.then( function(fulfilled){
+				serversAPI.clearServersTable()
+				.then(function(fulfilled) {
+					chai.request(baseUrl)
+					.get('/users/dropUserTable')
+					.end((err, res) => {
+						chai.request(baseUrl)
+						.get('/servers/initAndWriteDummyServer/')
+						.end((err,res) => {
+							
+							console.log('Is this body w token?: ', res.body);
+							var token = res.body.serverToken;
+
+							chai.request(baseUrl)
+							.post('/users/validate')
+							.set(token_header_flag, token)
+							.send({"username":"testUsername10", "password":"aaa"})
+							.end((err, res) => {
+								res.should.have.status(400);
+								done();
+							});
+						});
 					});
 				});
 			});
@@ -281,703 +613,109 @@ describe('Users', function()  {
 			then( function(fulfilled){
 
 				var userToGet = {
-					id: 10,
+					_ref: 'aaa',
+					applicationowner: 'hi',
+					type: 'conductor',
 					username: 'testUsername10',
 					password: 'aaa',
-					name: 'testName10',
-					surname: 'testSurname10',
+					fb: {
+						userId: '',
+						authToken: ''
+					},
+					firstName: 'testName10',
+					lastName: 'testSurname10',
 					country: 'Argentina10',
 					email: 'testEmail10@gmail.com',
 					birthdate: '24/05/1992'
 				};
-				
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/')
-				.end((err,res) => {
-					res.should.have.status(200);
-					
+
+				var userToGetId = 1;
+
+				businessUsersAPI.clearBusinessUsersTable()
+				.then(function(fulfilled) {
 					chai.request(baseUrl)
-					.get('/servers/initAndWriteDummyServer/')
+					.get('/business-users/initAndWriteDummyBusinessUser/')
 					.end((err,res) => {
 						res.should.have.status(200);
-						var oldAppToken = res.body.serverToken;
-						//console.log('Is this body OLD APP TOKEN inside JSON?: ', res.body);
-						chai.request(baseUrl)
-						.post('/token/')
-						.set('content-type', 'application/json')
-						.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-						.end((err, res) => {
-							res.should.have.status(201);
-							var businessUserToken = res.body.token.token;
+						serversAPI.clearServersTable()
+						.then(function(fulfilled) {
+						
 							chai.request(baseUrl)
-							.post('/users/')
-							.set(token_header_flag, oldAppToken)
-							.send(userToGet)
-							.end((err, res) => {
-								res.should.have.status(201);
-								
-								// Taking a small nap to let newToken and oldToken be different in time
-								console.log('Freezing for 2 senconds to make tokens differ in end time...');
-								var milliseconds = 2000;
-								var start = new Date().getTime();
-								for (var i = 0; i < 1e7; i++) {
-									if ((new Date().getTime() - start) > milliseconds){
-									  break;
-									}
-								}
-								console.log('TOKENNN: ' + oldAppToken);
+							.get('/servers/initAndWriteDummyServer/')
+							.end((err,res) => {
+								var oldAppToken = res.body.serverToken;
+
 								chai.request(baseUrl)
-								.post('/servers/ping/')
-								.set(token_header_flag, oldAppToken) // here still oldAppToken is OK
+								.get('/users/dropUserTable')
 								.end((err, res) => {
-									/// \todo averiguar por que a veces salta 401 unaothorized acá...
-									/// El error que leemos del token es que está vencido
-									/// Podría ser un tema de la definición de tiempo en chai mocha testing
-									/// Autenticación por token es usado en todos los demás tests y no anda mal
-									/// En este test lo que queremos probar es otra cosa:
-									/// Si para este método el token aún es válido (en un escenario real debería serlo)
-									/// La anulación del token funciona correctamente. Si en cambio el token expira
-									/// como se mencionó este test llega hasta acá y termina con error 401
 									res.should.have.status(200);
-									var newAppToken = res.body.ping.token.token;
-									jwt.verify(newAppToken, process.env.TOKEN_SECRET_KEY, function (err, decoded) {
-										// console.log('TOKEN DECODED: '+JSON.stringify(decoded));
+									//console.log('Is this body OLD APP TOKEN inside JSON?: ', res.body);
+									chai.request(baseUrl)
+									.post('/token/')
+									.set('content-type', 'application/json')
+									.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
+									.end((err, res) => {
+										res.should.have.status(201);
+										var businessUserToken = res.body.token.token;
 										chai.request(baseUrl)
-										.get('/users/' + userToGet.id)
-										.set(token_header_flag, oldAppToken) // oldAppToken has been invalidated
+										.post('/users/')
+										.set(token_header_flag, oldAppToken)
+										.send(userToGet)
 										.end((err, res) => {
-											res.should.have.status(401); // unauthorized
+											res.should.have.status(201);
+											
+											// Taking a small nap to let newToken and oldToken be different in time
+											console.log('Freezing for 2 senconds to make tokens differ in end time...');
+											var milliseconds = 2000;
+											var start = new Date().getTime();
+											for (var i = 0; i < 1e7; i++) {
+												if ((new Date().getTime() - start) > milliseconds){
+												  break;
+												}
+											}
+											console.log('TOKENNN: ' + oldAppToken);
 											chai.request(baseUrl)
-											.get('/users/' + userToGet.id)
-											.set(token_header_flag, newAppToken) // newAppToken should be ok
+											.post('/servers/ping/')
+											// .set('authorization', 'Bearer ' + oldAppToken)
+											.set(token_header_flag, oldAppToken) // here still oldAppToken is OK
 											.end((err, res) => {
+												/// \todo averiguar por que a veces salta 401 unaothorized acá...
+												/// El error que leemos del token es que está vencido
+												/// Podría ser un tema de la definición de tiempo en chai mocha testing
+												/// Autenticación por token es usado en todos los demás tests y no anda mal
+												/// En este test lo que queremos probar es otra cosa:
+												/// Si para este método el token aún es válido (en un escenario real debería serlo)
+												/// La anulación del token funciona correctamente. Si en cambio el token expira
+												/// como se mencionó este test llega hasta acá y termina con error 401
+												// done();
+												
 												res.should.have.status(200);
-												done();
+												var newAppToken = res.body.ping.token.token;
+												jwt.verify(newAppToken, process.env.TOKEN_SECRET_KEY, function (err, decoded) {
+													// console.log('TOKEN DECODED: '+JSON.stringify(decoded));
+													chai.request(baseUrl)
+													.get('/users/' + userToGetId)
+													.set(token_header_flag, oldAppToken) // oldAppToken has been invalidated
+													.end((err, res) => {
+														console.log('TOKENNN: ' + oldAppToken);
+														res.should.have.status(401); // unauthorized
+														chai.request(baseUrl)
+														.get('/users/' + userToGetId)
+														.set(token_header_flag, newAppToken) // newAppToken should be ok
+														.end((err, res) => {
+															res.should.have.status(200);
+															done();
+														});
+													});
+												});
+												
 											});
 										});
 									});
 								});
 							});
 						});
-					})
-				});
-			});
-	    });
-	});
-
-	var userToModify = {
-		id: 11,
-		username: 'testUsername11',
-		password: 'aaa',
-		name: 'testName11',
-		surname: 'testSurname11',
-		country: 'Argentina11',
-		email: 'testEmail11@gmail.com',
-		birthdate: '24/05/1992'
-	};
-
-	describe('/PUT user', function() {
-
-		it('it shouldnt PUT a user that doesnt exist', function(done) {
-			this.timeout(15000);
-			
-			usersAPI.clearUsersTable().
-			then( function(fulfilled){
-
-				chai.request(baseUrl)
-				.get('/servers/initAndWriteDummyServer/')
-				.end((err,res) => {
-				
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.serverToken;
-
-					chai.request(baseUrl)
-					.put('/users/' + userToModify.id)
-					.set(token_header_flag, token)
-					.send(userToModify)
-					.end((err, res) => {
-						res.should.have.status(404);
-						done();
-					});	
-				});
-			});
-	    });
-
-	  	it('it should PUT a modified user', function(done) {
-			this.timeout(15000);
-			
-			usersAPI.clearUsersTable().
-			then( function(fulfilled){
-
-				var userToModify = {
-					id: 11,
-					username: 'testUsername11',
-					name: 'testName11',
-					surname: 'testSurname11',
-					country: 'Argentina11',
-					email: 'testEmail11@gmail.com',
-					birthdate: '24/05/1992'
-				};
-				
-				chai.request(baseUrl)
-				.get('/servers/initAndWriteDummyServer/')
-				.end((err,res) => {
-
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.serverToken;
-
-					chai.request(baseUrl)
-					.post('/users/')
-					.set(token_header_flag, token)
-					.send(userToModify)
-					.end((err, res) => {
-						userToModify = {
-							id: 11,
-							username: 'modifiedUsername',
-							name: 'testName11',
-							surname: 'testSurname11',
-							country: 'Argentina11',
-							email: 'testEmail11@gmail.com',
-							birthdate: '24/05/1992'
-						};			
-
-						chai.request(baseUrl)
-						.put('/users/' + userToModify.id)
-						.set(token_header_flag, token)
-						.send(userToModify)
-						.end((err, res) => {
-							res.should.have.status(200);
-							res.body.username.should.equal('modifiedUsername');
-							done();
-						});
 					});
-					
-				});
-			});
-	    });
-	});
-
-	describe('/VALIDATE user', function() {
-	  	it('it should VALIDATE an existing user', function(done) {
-			this.timeout(15000);
-			
-			usersAPI.clearUsersTable()
-			.then( function(fulfilled){
-
-				var userToValidate = {
-					id: 10,
-					username: 'testUsername10',
-					password: 'aaa',
-					name: 'testName10',
-					surname: 'testSurname10',
-					country: 'Argentina10',
-					email: 'testEmail10@gmail.com',
-					birthdate: '24/05/1992'
-				};
-				
-				chai.request(baseUrl)
-				.get('/servers/initAndWriteDummyServer/')
-				.end((err,res) => {
-					
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.serverToken;
-
-					chai.request(baseUrl)
-					.post('/users/')
-					.set(token_header_flag, token)
-					.send(userToValidate)
-					.end((err, res) => {
-						res.body.should.have.property('username');
-						console.log('Server has been created\n');
-						chai.request(baseUrl)
-						.post('/users/validate')
-						.set(token_header_flag, token)
-						.send({"username":"testUsername10", "password":"aaa"})
-						.end((err, res) => {
-							res.should.have.status(200);
-							done();
-						});
-					});
-				});
-			});
-	    });
-
-	  	it('it shouldn\'t VALIDATE an user that doesn\'t exist', function(done) {
-			this.timeout(15000);
-			
-			usersAPI.clearUsersTable()
-			.then( function(fulfilled){
-				
-				chai.request(baseUrl)
-				.get('/servers/initAndWriteDummyServer/')
-				.end((err,res) => {
-					
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.serverToken;
-
-					chai.request(baseUrl)
-					.post('/users/validate')
-					.set(token_header_flag, token)
-					.send({"username":"testUsername10", "password":"aaa"})
-					.end((err, res) => {
-						res.should.have.status(400);
-						done();
-					});
-				});
-			});
-	    });
-	});
-});
-
-/**
- *  Test methods for application servers management endpoints
- *
- * Servers or application servers are the programs that run the system and operate with the client applications run by application users
- * These methods test endpoints for servers management
- */
- describe('Servers', function()  {
-
-	var serversAPI = require('../routes/servers');
-
-	describe('/GET servers', function() {
-	  	it('it should have no permission to access servers without token', function(done) {
-		    this.timeout(15000);
-		    serversAPI.clearServersTable()
-			.then( function(fulfilled){
-				chai.request(baseUrl)
-					.get('/servers/')
-					.end((err, res) => {
-						res.should.have.status(401);
-						done();
-					});
-			});
-	    });
-
-	    it('it should GET a server', function(done) {
-			this.timeout(15000);
-
-			serversAPI.clearServersTable()
-			.then( function(fulfilled){
-				
-				chai.request(baseUrl)
-				.post('/token/')
-				.set('content-type', 'application/json')
-				.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-				.end((err, res) => {
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.token.token;
-
-					var serverToGet = {
-						id: 12,
-						_ref: 'abc12',
-						createdBy: 12,
-						createdTime: 'testTime12',
-						name: 'Test12',
-						lastConnection: 12,
-						username: 'myAppServer',
-						password: 'aa'
-					};
-
-					chai.request(baseUrl)
-						.post('/servers/')
-						.set(token_header_flag, token)
-						.send(serverToGet)
-						.end((err, res) => {
-							chai.request(baseUrl)
-								.get('/servers/' + serverToGet.id)
-								.set(token_header_flag, token)
-								.end((err, res) => {
-									res.should.have.status(200);
-									done();
-								});
-						});
-				});
-			});
-	    });
-	});
-
-	describe('/POST server', function() {
-	  	it('it should POST a server', function(done) {
-			this.timeout(15000);
-
-	  		serversAPI.clearServersTable()
-			.then( function(fulfilled){
-
-			chai.request(baseUrl)
-				.post('/token/')
-				.set('content-type', 'application/json')
-				.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-				.end((err, res) => {
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.token.token;
-
-					var newServer = {
-						id: 10,
-						_ref: 'abc10',
-						createdBy: 10,
-						createdTime: 'abc10',
-						name: 'Dummy10',
-						lastConnection: 10,
-						username: 'myAppServer'
-					};
-
-					chai.request(baseUrl)
-						.post('/servers/')
-						.set(token_header_flag, token)
-						.send(newServer)
-						.end((err, res) => {
-							res.should.have.status(201);
-							res.body.should.have.property('metadata');
-							res.body.should.have.property('server');
-							res.body.should.have.property('token');
-						  done();
-						});
-					});
-			});
-	    });
-	 });
-
-	describe('/DELETE server', function() {
-	  	it('it should DELETE a server', function(done) {
-	  		this.timeout(15000);
-	  		serversAPI.clearServersTable()
-			.then( function(fulfilled){
-				
-				chai.request(baseUrl)
-				.post('/token/')
-				.set('content-type', 'application/json')
-				.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-				.end((err, res) => {
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.token.token;
-
-					var serverToDelete = {
-						id: 11,
-						_ref: 'abc11',
-						createdBy: 11,
-						createdTime: 'testTime11',
-						name: 'Test11',
-						lastConnection: 11,
-						username: 'myAppServer'
-					};
-
-					chai.request(baseUrl)
-					.post('/servers/')
-					.set(token_header_flag, token)
-					.send(serverToDelete)
-					.end((err, res) => {
-						chai.request(baseUrl)
-						.delete('/servers/' + serverToDelete.id)
-						.set(token_header_flag, token)
-						.send(serverToDelete)
-						.end((err, res) => {
-							res.should.have.status(204);
-							done();
-						});
-					});
-				});
-			});
-	    });
-
-	  	it('it shouldn\'t DELETE a server that doesn\'t exist', function(done) {
-	  		this.timeout(15000);
-	  		serversAPI.clearServersTable()
-			.then( function(fulfilled){
-				
-				chai.request(baseUrl)
-				.post('/token/')
-				.set('content-type', 'application/json')
-				.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-				.end((err, res) => {
-					console.log('Is this body w token?: ', res.body);
-					var token = res.body.token.token;
-
-					var serverToDelete = {
-						id: 11,
-						_ref: 'abc11',
-						createdBy: 11,
-						createdTime: 'testTime11',
-						name: 'Test11',
-						lastConnection: 11,
-						username: 'myAppServer'
-					};
-
-					chai.request(baseUrl)
-					.delete('/servers/' + serverToDelete.id)
-					.set(token_header_flag, token)
-					.send(serverToDelete)
-					.end((err, res) => {
-						res.should.have.status(404);
-						done();
-					});
-		
-				});
-			});
-	    });
-	});
-
-	describe('/PUT server', function() {
-	  	it('it should PUT a server', function(done) {
-			this.timeout(15000);
-
-			var serverToPost = {
-				id: 12,
-				_ref: 'abc12',
-				createdBy: 12,
-				createdTime: 'testTime12',
-				name: 'Test12',
-				lastConnection: 12,
-				username: 'myAppServer',
-				password: 'aa'
-			};
-
-			serversAPI.clearServersTable()
-			.then( function(fulfilled){
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/')
-				.end((err,res) => {
-
-					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-					.end((err, res) => {
-						console.log('Is this body w token?: ', res.body);
-						var token = res.body.token.token;
-						chai.request(baseUrl)
-						.post('/servers/')
-						.set(token_header_flag, token)
-						.send(serverToPost)
-						.end((err, res) => {
-
-							serverToPost = {
-								id: 12,
-								_ref: 'abc12',
-								createdBy: 12,
-								createdTime: 'testTime12',
-								name: 'ModifiedName',
-								lastConnection: 12,
-								username: 'myAppServer',
-								password: 'aa'
-							};
-
-							chai.request(baseUrl)
-							.put('/servers/' + serverToPost.id)
-							.set(token_header_flag, token)
-							.send(serverToPost)
-							.end((err, res) => {
-
-								chai.request(baseUrl)
-								.get('/servers/' + serverToPost.id)
-								.set(token_header_flag, token)
-								.end((err, res) => {
-									res.should.have.status(200);
-									console.log(res.body);
-									res.body.name.should.equal('ModifiedName');
-									done();
-								});
-							});
-						});
-					});
-				});
-			});
-	    });
-	});
-});
-
-/**
- *  Test methods for business users management endpoints
- *
- * Business users are the persons that manage the system with different levels of authorization
- * These methods test endpoints for business users management
- */
-describe('BusinessUsers', function()  {
-
-	var businessUsersAPI = require('../routes/business-users');
-
-	describe('/GET business user', function() {
-	  	it('it should GET business users from database', function(done) {
-		    this.timeout(15000);
-		    businessUsersAPI.clearBusinessUsersTable()
-			.then( function(fulfilled){
-				
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/') 
-				.end((err, res) => {
-
-					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-					.end((err, res) => {
-						console.log('Is this body w token?: ', res.body);
-						var token = res.body.token.token;
-
-						chai.request(baseUrl)
-						.get('/business-users/')
-						.set(token_header_flag, token)
-						.end((err, res) => {
-							res.should.have.status(200);
-							res.body.should.be.a('array');
-							res.body.length.should.be.eql(1);
-							done();
-						});
-					});				
-				});
-			});
-	    });
-	});
-
-	describe('/POST business user', function() {
-	  	it('it should POST a business user', function(done) {
-			this.timeout(15000);
-
-	  		businessUsersAPI.clearBusinessUsersTable()
-			.then( function(fulfilled){
-
-				var newBusinessUser = {
-				    id: 2,
-				    _ref: 'a2',
-				    username: 'carlossanchez',
-				    password: 'carlos123',
-				    name: 'Carlos',
-				    surname: 'Sanchez',
-					roles: ['admin', 'user']
-				};
-
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/') 
-				.end((err, res) => {
-
-					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-					.end((err, res) => {
-						console.log('Is this body w token?: ', res.body);
-						var token = res.body.token.token;
-
-						chai.request(baseUrl)
-						.post('/business-users/')
-						.set(token_header_flag, token)
-						.send(newBusinessUser)
-						.end((err, res) => {
-							res.should.have.status(201);
-							res.body.should.have.property('username');
-							res.body.should.have.property('surname');
-						  done();
-						});
-
-					});				
-				});
-			});
-	    });
-	});
-
-	describe('/DELETE business user', function() {
-	  	it('it should DELETE a business user', function(done) {
-	  		this.timeout(15000);
-	  		businessUsersAPI.clearBusinessUsersTable()
-			.then( function(fulfilled){
-
-				var businessUserToDelete = {
-				    id: 3,
-				    _ref: 'a3',
-				    username: 'johnBlack',
-				    name: 'John',
-				    surname: 'Black',
-					roles: ['admin', 'user']
-				};
-
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/') 
-				.end((err, res) => {
-
-					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-					.end((err, res) => {
-						console.log('Is this body w token?: ', res.body);
-						var token = res.body.token.token;
-
-						chai.request(baseUrl)
-						.post('/business-users/')
-						.set(token_header_flag, token)
-						.send(businessUserToDelete)
-						.end((err, res) => {
-							chai.request(baseUrl)
-								.delete('/business-users/' + businessUserToDelete.id)
-								.set(token_header_flag, token)
-								.send(businessUserToDelete)
-								.end((err, res) => {
-									res.should.have.status(204);
-									done();
-								});
-						});
-
-					});				
-				});
-			});
-	    });
-	});
-
-	describe('/PUT business user', function() {
-
-		var businessuserToModify = {
-		    id: 3,
-		    _ref: 'a3',
-		    username: 'johnBlack',
-		    password: 'abc',
-		    name: 'John',
-		    surname: 'Black',
-			roles: ['user']
-		};
-
-		it('it shouldn\'t PUT a business user that doesnt exist', function(done) {
-	  		this.timeout(15000);
-	  		businessUsersAPI.clearBusinessUsersTable()
-			.then( function(fulfilled){
-
-				chai.request(baseUrl)
-				.get('/business-users/initAndWriteDummyBusinessUser/') 
-				.end((err, res) => {
-
-					chai.request(baseUrl)
-					.post('/token/')
-					.set('content-type', 'application/json')
-					.send({"BusinessUserCredentials":{"username":"johnny", "password":"aaa"}})
-					.end((err, res) => {
-						console.log('Is this body w token?: ', res.body);
-						var token = res.body.token.token;
-
-						chai.request(baseUrl)
-						.post('/business-users/')
-						.set(token_header_flag, token)
-						.send(businessuserToModify)
-						.end((err, res) => {
-							businessuserToModify = {
-							    id: 3,
-							    _ref: 'a3',
-							    username: 'johnBlack',
-							    password: 'abc',
-							    name: 'Tom',
-							    surname: 'White',
-								roles: ['user']
-							};
-							chai.request(baseUrl)
-							.put('/business-users/' + businessuserToModify.id)
-							.set(token_header_flag, token)
-							.send(businessuserToModify)
-							.end((err, res) => {
-								res.should.have.status(200);
-								res.body.username.should.equal('johnBlack');
-								res.body.name.should.equal('Tom');
-								done();
-							});
-						});
-
-					});				
 				});
 			});
 	    });

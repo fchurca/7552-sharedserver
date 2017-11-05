@@ -3,7 +3,11 @@ var router = express.Router();
 var verify = require('./verify');
 var api = require('./api');
 
-var BusinessUsers = require('../models/businessuser');
+//var BusinessUsers = require('../models/businessuser');
+
+var models = require('../models/db'); // loads db.js
+var BusinessUsers = models.businessuser;       // the model keyed by its name
+
 /** 
  * This endpoint creates a new token and sends it to the user if the username and password provided are valid
 **/
@@ -35,11 +39,11 @@ router.post('/', function (request, response){
 				var appOk = businessUser.roles.indexOf(process.env.TAG_APP) !== -1;
 				var userOk = businessUser.roles.indexOf(process.env.TAG_USER) !== -1;
 				var payload = {
-					 username: businessUser.username,
-					 userOk: userOk,
-					 appOk: appOk, // normally it would be false to business users
-					 managerOk: managerOk,
-					 adminOk: adminOk
+					username: businessUser.username,
+					userOk: userOk,
+					appOk: appOk, // normally it would be false to business users
+					managerOk: managerOk,
+					adminOk: adminOk
 				};
 				var localToken = verify.getToken(payload);
 				response.writeHead(201, {"Content-Type": "application/json"});
